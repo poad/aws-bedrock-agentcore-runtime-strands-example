@@ -1,0 +1,38 @@
+packages:
+  - .
+  - ./agent
+  - ./cdk
+  - ./deploy-role
+  - ./frontend
+
+allowBuilds:
+  '@parcel/watcher': false
+  core-js: false
+  esbuild: false
+  protobufjs: false
+  unrs-resolver: false
+
+blockExoticSubdeps: true
+
+minimumReleaseAge: 10080 # 7 days in minutes
+minimumReleaseAgeExclude:
+  - solid-js@1.9.14
+  - handlebars@4.7.9
+  - lodash@4.17.24
+  - immutable@3.8.3
+  - pnpm@11.14.0
+
+overrides:
+  chokidar: '>=5'
+  eslint-import-resolver-typescript: '^4.4.5'
+  graphql: ^17.0.2
+  handlebars@>=4.0.0 <4.7.9: ^4.7.9
+  handlebars@>=4.0.0 <=4.7.8: ^4.7.9
+  handlebars@>=4.6.0 <=4.7.8: ^4.7.9
+  immutable@<3.8.3: ^3.8.3
+  lodash@<=4.17.23: ^4.17.24
+  lodash@>=4.0.0 <=4.17.23: ^4.17.24
+  semver: '>=7'
+  ua-parser-js: ^2.0.10
+
+trustPolicy: no-downgrade
