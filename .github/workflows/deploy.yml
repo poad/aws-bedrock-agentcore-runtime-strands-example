@@ -1,0 +1,56 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-west-2
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    # 同時実行すると CREATE_IN_PROGRESS や UPDATE_IN_PROGRESS 状態で cdk deploy を行う可能性があるため抑止する
+    concurrency:
+      group: "cloudformation-aws-bedrock-agentcore-runtime-strands-example-basic"
+      cancel-in-progress: false
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Install pnpm
+      uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1.0.0
+
+    - name: Install global dependencies
+      run: pnpm add -g aws-cdk esbuild
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+      with:
+        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/aws-bedrock-agentcore-runtime-strands-example-deploy-role
+        role-session-name: GitHubActions
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Resolves SSM Parameter version
+      id: ssm-parameter-version
+      run: echo "version=$(aws ssm get-parameters --names '/agentcore/databricks/client-secret' --query 'Parameters[0].Version')" >> "$GITHUB_OUTPUT"
+    - name: deploy
+      working-directory: ./cdk
+      env:
+        DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+        DATABRICKS_WORKSPACE_HOST: ${{ vars.DATABRICKS_WORKSPACE_HOST }}
+        DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+      run: |
+        pnx aws-cdk@latest deploy \
+          -c "databricks-client-id=$DATABRICKS_CLIENT_ID" \
+          -c "databricks-workdpace-host=$DATABRICKS_WORKSPACE_HOST" \
+          -c "databricks-client-secret=$DATABRICKS_CLIENT_SECRET" \
+          --require-approval=never --all
