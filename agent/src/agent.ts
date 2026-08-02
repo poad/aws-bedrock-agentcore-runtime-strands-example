@@ -1,10 +1,18 @@
 import { tools } from './tools/aws-tool.js';
 import { Agent, BedrockModel } from '@strands-agents/sdk';
 
-const createAgent = async ({ model: modelId, session, user = 'anonymous' }: { model: string, session: string, user?: string }) => {
+const createAgent = async (
+  {
+    session,
+    user = 'anonymous',
+  }: {
+    session: string,
+    user?: string,
+  },
+) => {
   const model = new BedrockModel({
     region: 'us-east-1',
-    modelId: modelId,
+    modelId: 'us.amazon.nova-micro-v1:0',
     maxTokens: 4096,
   });
 
