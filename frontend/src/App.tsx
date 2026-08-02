@@ -1,5 +1,5 @@
 import { SignOutButton } from './components/SignOut.jsx';
-import { AgentCoreRuntimeService, StreamEvent } from './service/AgentCoreRuntimeService.ts';
+import { runAgentTurn } from './service/AgentCoreRuntimeService.ts';
 import { Authenticator } from '@aws-amplify/ui-react';
 import {
   MainContainer,
@@ -40,73 +40,15 @@ interface ToolCall {
 }
 
 const streamEventHandler = async (
-  event: StreamEvent,
+  event: unknown,
   updateMessage: (segments: MessageSegment[]) => void,
   setIsLoading: (state: boolean) => void,
 ) => {
-  const segments: MessageSegment[] = [];
-  const toolCallMap = new Map<string, ToolCall>();
-
-  switch (event.type) {
-    case 'text': {
-      // If text arrives after a tool segment, mark all pending tools as complete
-      const prev = segments[segments.length - 1];
-      if (prev && prev.type === 'tool') {
-        for (const tc of toolCallMap.values()) {
-          if (tc.status === 'streaming' || tc.status === 'executing') {
-            tc.status = 'complete';
-          }
-        }
-      }
-      // Append to last text segment, or create new one
-      const last = segments[segments.length - 1];
-      if (last && last.type === 'text') {
-        last.content += event.content;
-      } else {
-        segments.push({ type: 'text', content: event.content });
-      }
-      updateMessage(segments);
-      break;
-    }
-    case 'tool_use_start': {
-      const tc: ToolCall = {
-        toolUseId: event.toolUseId,
-        name: event.name,
-        input: '',
-        status: 'streaming',
-      };
-      toolCallMap.set(event.toolUseId, tc);
-      segments.push({ type: 'tool', toolCall: tc });
-      updateMessage(segments);
-      break;
-    }
-    case 'tool_use_delta': {
-      const tc = toolCallMap.get(event.toolUseId);
-      if (tc) {
-        tc.input += event.input;
-      }
-      updateMessage(segments);
-      break;
-    }
-    case 'tool_result': {
-      const tc = toolCallMap.get(event.toolUseId);
-      if (tc) {
-        tc.result = event.result;
-        tc.status = 'complete';
-      }
-      updateMessage(segments);
-      break;
-    }
-    case 'message': {
-      if (event.role === 'assistant') {
-        for (const tc of toolCallMap.values()) {
-          if (tc.status === 'streaming') tc.status = 'executing';
-        }
-        updateMessage(segments);
-      }
-      break;
-    }
-  }
+  console.log(event);
+  updateMessage([{
+    type: 'text',
+    content: event as string,
+  }]);
   setIsLoading(false);
 };
 
@@ -151,8 +93,26 @@ function App() {
     }
 
     setIsLoading(true);
-    await AgentCoreRuntimeService.invoke(message, sessionId, accessToken?.toString(),
-      (event) => streamEventHandler(event, updateMessage, setIsLoading), url);
+    await runAgentTurn({
+      endpoint: url,
+      sessionId,
+      prompt: message,
+      authToken: accessToken?.toString(),
+      onAskUser: async (interrupt: {
+        id: string
+        name: string
+        reason: unknown
+      }) => {
+        console.log(interrupt);
+        return '';
+      },
+      onDelta: (text) => {
+        // トークン単位で届く応答をそのままUIに追記していく
+        streamEventHandler(text, updateMessage, setIsLoading);
+      },
+      onMessage: (event) => streamEventHandler(event, updateMessage, setIsLoading),
+    },
+    );
   }
 
   return (

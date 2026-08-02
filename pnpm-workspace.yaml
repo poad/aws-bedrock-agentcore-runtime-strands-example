@@ -16,7 +16,7 @@ blockExoticSubdeps: true
 
 minimumReleaseAge: 10080 # 7 days in minutes
 minimumReleaseAgeExclude:
-  - pnpm@11.19.0
+  - pnpm@11.20.0
   - '@hono/node-server@2.0.5'
   - fast-uri@3.1.4 || 4.1.1
   - fast-xml-parser@5.10.1

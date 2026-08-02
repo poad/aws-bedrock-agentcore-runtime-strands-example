@@ -1,183 +1,117 @@
-/** Stream event types emitted by parsers */
-export type StreamEvent =
-  | { type: 'text'; content: string }
-  | { type: 'tool_use_start'; toolUseId: string; name: string }
-  | { type: 'tool_use_delta'; toolUseId: string; input: string }
-  | { type: 'tool_result'; toolUseId: string; result: string }
-  | { type: 'message'; role: string; content: unknown[] }
-  | { type: 'result'; stopReason: string }
-  | { type: 'lifecycle'; event: string };
-
-/** Parses a single SSE line and emits events via callback */
-export type ChunkParser = (line: string, callback: StreamCallback) => void;
-
-/** Callback invoked with each stream event */
-export type StreamCallback = (event: StreamEvent) => void;
-
 /**
- * Parses SSE chunks from Strands agents.
- * Emits typed StreamEvents for text, tool use, messages, and lifecycle.
+ * AgentCore Runtimeエンドポイント(SSE)と通信し、
+ * 割り込み(interrupt)が発生したらコールバックでユーザーに確認を取り、
+ * 回答を送り返して Agent Loop を再開するクライアント。
+ * agent側が agent.stream() ベースになったため、'messageDelta' で
+ * トークン単位の応答も逐次受け取れる。
+ *
+ * 認証(Cognito JWTなど)を使う場合は fetch の headers に
+ * Authorization: `Bearer ${accessToken}` を追加する。
  */
-const parseStrandsChunk: ChunkParser = (line, callback) => {
-  if (!line.startsWith('data: ')) return;
 
-  const data = line.substring(6).trim();
-  if (!data) return;
+interface InterruptPayload {
+  id: string
+  name: string
+  reason: unknown
+}
 
-  try {
-    const json = JSON.parse(data);
+type AgentEvent =
+  | { event: 'messageDelta'; data: { text: string } }
+  | { event: 'interrupt'; data: { interrupts: InterruptPayload[] } }
+  | { event: 'message'; data: { message: unknown } };
 
-    // Text streaming
-    if (typeof json.data === 'string') {
-      callback({ type: 'text', content: json.data });
-      return;
-    }
+export type AskUserFn = (interrupt: InterruptPayload) => Promise<string>;
 
-    if (typeof json.text === 'string') {
-      callback({ type: 'text', content: json.text });
-      return;
-    }
+export async function runAgentTurn(params: {
+  endpoint: string
+  sessionId: string
+  prompt: string
+  authToken?: string
+  onAskUser: AskUserFn
+  onDelta?: (text: string) => void
+  onMessage: (message: unknown) => void
+}): Promise<void> {
+  const { endpoint, sessionId, prompt, authToken, onAskUser, onDelta, onMessage } = params;
 
-    // Tool use streaming
-    if (json.current_tool_use) {
-      const tool = json.current_tool_use;
-      // First delta for a tool has empty input — treat as start
-      if (json.delta?.toolUse?.input === '') {
-        callback({
-          type: 'tool_use_start',
-          toolUseId: tool.toolUseId,
-          name: tool.name,
-        });
-      } else if (json.delta?.toolUse?.input) {
-        callback({
-          type: 'tool_use_delta',
-          toolUseId: tool.toolUseId,
-          input: json.delta.toolUse.input,
-        });
+  let body: Record<string, unknown> = { message: prompt };
+
+  // interrupt が返ってくる限りループして送り返す
+  // (1ターンの中で複数回ユーザーに確認を取るケースに対応)
+
+  while (true) {
+    let pendingInterrupts: InterruptPayload[] | null = null;
+    let finalMessage: unknown = undefined;
+
+    await postAndReadSSE(endpoint, sessionId, body, authToken, (event) => {
+      if (event.event === 'messageDelta') {
+        onDelta?.(event.data.text);
+      } else if (event.event === 'interrupt') {
+        pendingInterrupts = event.data.interrupts;
+      } else if (event.event === 'message') {
+        finalMessage = event.data.message;
       }
+    });
+
+    if (!pendingInterrupts) {
+      onMessage(finalMessage);
       return;
     }
 
-    // Complete message (assistant with toolUse, or user with toolResult)
-    if (json.message) {
-      const msg = json.message;
-      callback({ type: 'message', role: msg.role, content: msg.content });
+    // ユーザーに質問を提示し、回答を集める
+    const interrupts: InterruptPayload[] = pendingInterrupts;
+    const interruptResponses = await Promise.all(
+      interrupts.map(async (interrupt: InterruptPayload) => ({
+        interruptId: interrupt.id,
+        response: await onAskUser(interrupt),
+      })),
+    );
 
-      // Extract tool results from user messages
-      if (msg.role === 'user' && Array.isArray(msg.content)) {
-        for (const block of msg.content) {
-          if (block.toolResult) {
-            const resultText =
-              block.toolResult.content
-                ?.map((c: { text?: string }) => c.text)
-                .filter(Boolean)
-                .join('') || JSON.stringify(block.toolResult.content);
-            callback({
-              type: 'tool_result',
-              toolUseId: block.toolResult.toolUseId,
-              result: resultText,
-            });
-          }
-        }
-      }
-      return;
-    }
-
-    // Final result
-    if (json.result) {
-      callback({
-        type: 'result',
-        stopReason: typeof json.result === 'object' ? json.result.stop_reason : 'end_turn',
-      });
-      return;
-    }
-
-    // Lifecycle events
-    if (json.init_event_loop || json.start_event_loop || json.start) {
-      const event = json.init_event_loop ? 'init' : json.start_event_loop ? 'start_loop' : 'start';
-      callback({ type: 'lifecycle', event });
-      return;
-    }
-  } catch {
-    console.debug('Failed to parse strands event:', data);
-  }
-};
-
-/** Reads an SSE response stream, passing each line to the parser. */
-async function readSSEStream(
-  response: Response,
-  parser: ChunkParser,
-  callback: StreamCallback,
-): Promise<void> {
-  let buffer = '';
-
-  if (!response.body) {
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.trim()) {
-          parser(line, callback);
-        }
-      }
-    }
-
-    // Process any remaining data in the buffer
-    if (buffer.trim()) {
-      parser(buffer, callback);
-    }
-  } finally {
-    reader.releaseLock();
+    body = { interruptResponses };
   }
 }
 
-export const AgentCoreRuntimeService = {
+async function postAndReadSSE(
+  endpoint: string,
+  sessionId: string,
+  body: Record<string, unknown>,
+  authToken: string | undefined,
+  onEvent: (event: AgentEvent) => void,
+): Promise<void> {
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id': sessionId,
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
 
-  invoke: async function (
-    query: string,
-    sessionId: string,
-    accessToken: string,
-    onEvent: StreamCallback,
-    endpoint: string,
-  ): Promise<void> {
-    if (!accessToken) throw new Error('No valid access token found.');
+  if (!res.ok || !res.body) {
+    throw new Error(`Agent request failed: ${res.status}`);
+  }
 
-    const traceId = `1-${Math.floor(Date.now() / 1000).toString(16)}-${crypto.randomUUID()}`;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
 
-    const body = {
-      message: query,
-    };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'X-Amzn-Trace-Id': traceId,
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        'X-Amzn-Bedrock-AgentCore-Runtime-Session-Id': sessionId,
-      },
-      body: JSON.stringify(body),
-    });
+    // SSEは "\n\n" 区切りのイベント単位で届く
+    const chunks = buffer.split('\n\n');
+    buffer = chunks.pop() ?? '';
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    for (const chunk of chunks) {
+      const eventLine = chunk.split('\n').find((l) => l.startsWith('event:'));
+      const dataLine = chunk.split('\n').find((l) => l.startsWith('data:'));
+      if (!eventLine || !dataLine) continue;
+
+      const eventName = eventLine.replace('event:', '').trim();
+      const data = JSON.parse(dataLine.replace('data:', '').trim());
+      onEvent({ event: eventName, data } as AgentEvent);
     }
-
-    await readSSEStream(response, parseStrandsChunk, onEvent);
-  },
-};
+  }
+}
