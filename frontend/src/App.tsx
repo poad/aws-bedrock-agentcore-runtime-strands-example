@@ -1,6 +1,6 @@
 import { SignOutButton } from './components/SignOut.jsx';
-import { AgentCoreRuntimeService, StreamEvent } from './service/AgentCoreRuntimeService.ts';
-import { Authenticator } from '@aws-amplify/ui-react';
+import { runAgentTurn } from './service/AgentCoreRuntimeService.ts';
+import { Authenticator, Button, Input } from '@aws-amplify/ui-react';
 import {
   MainContainer,
   ChatContainer,
@@ -9,7 +9,7 @@ import {
   Message,
   TypingIndicator,
 } from '@chatscope/chat-ui-kit-react';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
@@ -22,6 +22,12 @@ interface History {
   content: string;
   sender: 'あなた' | 'AI';
   segments: MessageSegment[];
+}
+
+interface InterruptPayload {
+  id: string;
+  name: string;
+  reason: unknown;
 }
 
 const config = await (await fetch('/config.json')).json();
@@ -40,81 +46,98 @@ interface ToolCall {
 }
 
 const streamEventHandler = async (
-  event: StreamEvent,
+  event: unknown,
   updateMessage: (segments: MessageSegment[]) => void,
   setIsLoading: (state: boolean) => void,
 ) => {
-  const segments: MessageSegment[] = [];
-  const toolCallMap = new Map<string, ToolCall>();
-
-  switch (event.type) {
-    case 'text': {
-      // If text arrives after a tool segment, mark all pending tools as complete
-      const prev = segments[segments.length - 1];
-      if (prev && prev.type === 'tool') {
-        for (const tc of toolCallMap.values()) {
-          if (tc.status === 'streaming' || tc.status === 'executing') {
-            tc.status = 'complete';
-          }
-        }
-      }
-      // Append to last text segment, or create new one
-      const last = segments[segments.length - 1];
-      if (last && last.type === 'text') {
-        last.content += event.content;
-      } else {
-        segments.push({ type: 'text', content: event.content });
-      }
-      updateMessage(segments);
-      break;
-    }
-    case 'tool_use_start': {
-      const tc: ToolCall = {
-        toolUseId: event.toolUseId,
-        name: event.name,
-        input: '',
-        status: 'streaming',
-      };
-      toolCallMap.set(event.toolUseId, tc);
-      segments.push({ type: 'tool', toolCall: tc });
-      updateMessage(segments);
-      break;
-    }
-    case 'tool_use_delta': {
-      const tc = toolCallMap.get(event.toolUseId);
-      if (tc) {
-        tc.input += event.input;
-      }
-      updateMessage(segments);
-      break;
-    }
-    case 'tool_result': {
-      const tc = toolCallMap.get(event.toolUseId);
-      if (tc) {
-        tc.result = event.result;
-        tc.status = 'complete';
-      }
-      updateMessage(segments);
-      break;
-    }
-    case 'message': {
-      if (event.role === 'assistant') {
-        for (const tc of toolCallMap.values()) {
-          if (tc.status === 'streaming') tc.status = 'executing';
-        }
-        updateMessage(segments);
-      }
-      break;
-    }
-  }
+  console.log(event);
+  updateMessage([{
+    type: 'text',
+    content: event as string,
+  }]);
   setIsLoading(false);
 };
+
+function InterruptModal({
+  interrupt,
+  onSubmit,
+  onCancel,
+}: {
+  interrupt: InterruptPayload;
+  onSubmit: (response: string) => void;
+  onCancel: () => void;
+}) {
+  const [response, setResponse] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(response);
+  };
+
+  // Auto-focus the input when modal opens
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const overlayStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  };
+
+  const modalStyle: React.CSSProperties = {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '24px',
+    maxWidth: '500px',
+    width: '90%',
+    maxHeight: '80vh',
+    overflow: 'auto',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+  };
+
+  return (
+    <div style={overlayStyle} onClick={onCancel}>
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        <h2 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 600 }}>
+          {interrupt.name || '確認が必要です'}
+        </h2>
+        <p style={{ margin: '0 0 24px 0', color: '#666', whiteSpace: 'pre-wrap' }}>
+          {typeof interrupt.reason === 'string' ? interrupt.reason : JSON.stringify(interrupt.reason, null, 2)}
+        </p>
+        <form onSubmit={handleSubmit}>
+          <Input
+            ref={inputRef}
+            placeholder="回答を入力してください..."
+            value={response}
+            onChange={(e) => setResponse(e.target.value)}
+            style={{ width: '100%', marginBottom: '16px' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <Button variation="link" onClick={onCancel}>キャンセル</Button>
+            <Button variation="primary" onClick={handleSubmit} disabled={!response.trim()}>送信</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const inputRef = useRef(null);
   const [messages, setMessages] = useState<History[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [sessionId] = useState(() => crypto.randomUUID());
+  const [currentInterrupt, setCurrentInterrupt] = useState<InterruptPayload | null>(null);
+  const [interruptResolve, setInterruptResolve] = useState<((response: string) => void) | null>(null);
 
   const updateMessage = (segments: MessageSegment[]) => {
     // Build content from text segments for backward compat
@@ -151,8 +174,25 @@ function App() {
     }
 
     setIsLoading(true);
-    await AgentCoreRuntimeService.invoke(message, sessionId, accessToken?.toString(),
-      (event) => streamEventHandler(event, updateMessage, setIsLoading), url);
+    await runAgentTurn({
+      endpoint: url,
+      sessionId,
+      prompt: message,
+      authToken: accessToken?.toString(),
+      onAskUser: async (interrupt: InterruptPayload) => {
+        // Show modal and wait for user response
+        return new Promise<string>((resolve) => {
+          setCurrentInterrupt(interrupt);
+          setInterruptResolve(() => resolve);
+        });
+      },
+      onDelta: (text) => {
+        // トークン単位で届く応答をそのままUIに追記していく
+        streamEventHandler(text, updateMessage, setIsLoading);
+      },
+      onMessage: (event) => streamEventHandler(event, updateMessage, setIsLoading),
+    },
+    );
   }
 
   return (
@@ -213,6 +253,21 @@ function App() {
                 />
               </ChatContainer>
             </MainContainer>
+            {currentInterrupt && interruptResolve && (
+              <InterruptModal
+                interrupt={currentInterrupt}
+                onSubmit={(response) => {
+                  interruptResolve(response);
+                  setCurrentInterrupt(null);
+                  setInterruptResolve(null);
+                }}
+                onCancel={() => {
+                  interruptResolve('');
+                  setCurrentInterrupt(null);
+                  setInterruptResolve(null);
+                }}
+              />
+            )}
           </div>
         </main>
       )}
