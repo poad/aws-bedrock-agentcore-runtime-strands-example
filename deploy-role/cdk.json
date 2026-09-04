@@ -1,5 +1,5 @@
 {
-  "app": "pnpm dlx tsx bin/deploy-role.ts",
+  "app": "pnx --allow-build=esbuild tsx bin/deploy-role.ts",
   "watch": {
     "include": [
       "**"

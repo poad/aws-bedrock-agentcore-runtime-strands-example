@@ -35,10 +35,10 @@
     "@opentelemetry/sdk-node": "^0.220.0",
     "@opentelemetry/sdk-trace-base": "^2.10.0",
     "@opentelemetry/sdk-trace-node": "^2.10.0",
-    "@strands-agents/sdk": "^1.14.0",
+    "@strands-agents/sdk": "^1.15.0",
     "bedrock-agentcore": "^0.4.3",
     "uuid": "^14.0.2",
     "ws": "^8.21.3",
-    "zod": "^4.4.3"
+    "zod": "^4.5.1"
   }
 }
