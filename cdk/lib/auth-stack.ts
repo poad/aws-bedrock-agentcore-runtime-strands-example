@@ -65,10 +65,7 @@ export class AuthStack extends cdk.Stack {
           props.distributionUrl,
           'http://localhost:5173/', // ローカル開発用
         ],
-        logoutUrls: [
-          props.distributionUrl,
-          'http://localhost:5173/',
-        ],
+        logoutUrls: [props.distributionUrl, 'http://localhost:5173/'],
       },
     });
   }

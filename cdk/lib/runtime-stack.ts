@@ -1,9 +1,10 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import * as cdk from 'aws-cdk-lib';
 import * as bedrockagentcore from 'aws-cdk-lib/aws-bedrockagentcore';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 export interface AgentCoreStackProps extends cdk.StackProps {
@@ -27,16 +28,20 @@ export class AgentCoreStack extends cdk.Stack {
     const databricksUcTablePrefix = this.node.tryGetContext('databricksUcTablePrefix');
 
     const secret = cdk.SecretValue.unsafePlainText(databricksClientSecret);
-    const databricksProvider = bedrockagentcore.OAuth2CredentialProvider.usingCustom(this, 'DatabricksOAuthProvider', {
-      oAuth2CredentialProviderName: 'databricks-telemetry-provider',
-      clientId: databricksClientId,
-      clientSecret: secret,
-      authorizationServerMetadata: {
-        issuer: `https://${databricksWorkspaceHost}/oidc`,
-        authorizationEndpoint: `https://${databricksWorkspaceHost}/oidc/v1/authorize`,
-        tokenEndpoint: `https://${databricksWorkspaceHost}/oidc/v1/token`,
+    const databricksProvider = bedrockagentcore.OAuth2CredentialProvider.usingCustom(
+      this,
+      'DatabricksOAuthProvider',
+      {
+        oAuth2CredentialProviderName: 'databricks-telemetry-provider',
+        clientId: databricksClientId,
+        clientSecret: secret,
+        authorizationServerMetadata: {
+          issuer: `https://${databricksWorkspaceHost}/oidc`,
+          authorizationEndpoint: `https://${databricksWorkspaceHost}/oidc/v1/authorize`,
+          tokenEndpoint: `https://${databricksWorkspaceHost}/oidc/v1/token`,
+        },
       },
-    });
+    );
 
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
@@ -52,7 +57,7 @@ export class AgentCoreStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal('bedrock-agentcore.amazonaws.com'),
       description: 'IAM role for Bedrock AgentCore Runtime',
       inlinePolicies: {
-        'BedrockAgentCoreRuntimePolicy': new iam.PolicyDocument({
+        BedrockAgentCoreRuntimePolicy: new iam.PolicyDocument({
           statements: [
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
@@ -73,7 +78,9 @@ export class AgentCoreStack extends cdk.Stack {
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
               actions: ['logs:DescribeLogStreams', 'logs:CreateLogGroup'],
-              resources: [`arn:aws:logs:${region}:${accountId}:log-group:/aws/bedrock-agentcore/runtimes/*`],
+              resources: [
+                `arn:aws:logs:${region}:${accountId}:log-group:/aws/bedrock-agentcore/runtimes/*`,
+              ],
             }),
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
@@ -83,7 +90,9 @@ export class AgentCoreStack extends cdk.Stack {
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
               actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
-              resources: [`arn:aws:logs:${region}:${accountId}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`],
+              resources: [
+                `arn:aws:logs:${region}:${accountId}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`,
+              ],
             }),
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
@@ -110,7 +119,7 @@ export class AgentCoreStack extends cdk.Stack {
             }),
           ],
         }),
-        'BedrockAgentCoreIdentityPolicy': new iam.PolicyDocument({
+        BedrockAgentCoreIdentityPolicy: new iam.PolicyDocument({
           statements: [
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
@@ -125,7 +134,9 @@ export class AgentCoreStack extends cdk.Stack {
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
               actions: ['secretsmanager:GetSecretValue'],
-              resources: [`arn:aws:secretsmanager:${this.region}:${this.account}:secret:bedrock-agentcore-identity!default/oauth2/databricks-telemetry-provider*`],
+              resources: [
+                `arn:aws:secretsmanager:${this.region}:${this.account}:secret:bedrock-agentcore-identity!default/oauth2/databricks-telemetry-provider*`,
+              ],
             }),
           ],
         }),

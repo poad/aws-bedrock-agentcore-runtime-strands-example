@@ -14,12 +14,12 @@ Amazon Bedrock AgentCore Runtime とストリーミング通信する、React + 
 
 frontend/
 ├── src/
-│   ├── main.tsx                          # エントリポイント。/amplifyconfiguration.json を取得して Amplify.configure()
-│   ├── app.tsx                           # チャット画面本体。ストリーミングイベントのハンドリングとメッセージ表示
-│   ├── components/
-│   │   └── SignOut.tsx                   # サインアウトボタン
-│   └── service/
-│       └── AgentCoreRuntimeService.ts    # AgentCore Runtime への SSE リクエスト・イベントパース
+│ ├── main.tsx # エントリポイント。/amplifyconfiguration.json を取得して Amplify.configure()
+│ ├── app.tsx # チャット画面本体。ストリーミングイベントのハンドリングとメッセージ表示
+│ ├── components/
+│ │ └── SignOut.tsx # サインアウトボタン
+│ └── service/
+│ └── AgentCoreRuntimeService.ts # AgentCore Runtime への SSE リクエスト・イベントパース
 ├── public/
 ├── index.html
 ├── package.json
@@ -29,10 +29,10 @@ frontend/
 
 このアプリはビルド時の環境変数ではなく、実行時に静的ファイルとして配信される 2 つの JSON を `fetch` して初期化します。いずれも [`cdk/`](../cdk) の `FrontendDeployStack` がデプロイ時に生成し、S3 バケットのルートに配置します。
 
-| ファイル | 内容 | 用途 |
-| --- | --- | --- |
-| `/amplifyconfiguration.json` | Cognito `userPoolId` / `userPoolClientId` | `Amplify.configure()` に渡してサインイン機能を有効化 |
-| `/config.json` | `region` / `runtimeArn`（AgentCore Runtime の ARN） | AgentCore Runtime の invocations エンドポイント URL を組み立てる |
+| ファイル                     | 内容                                                | 用途                                                             |
+| ---------------------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| `/amplifyconfiguration.json` | Cognito `userPoolId` / `userPoolClientId`           | `Amplify.configure()` に渡してサインイン機能を有効化             |
+| `/config.json`               | `region` / `runtimeArn`（AgentCore Runtime の ARN） | AgentCore Runtime の invocations エンドポイント URL を組み立てる |
 
 ローカル開発時にこれらのファイルを用意していない場合、起動時の `fetch` が失敗するため、`cdk/` でデプロイ済みの値をもとに `frontend/public/` へ手動で配置してください。
 

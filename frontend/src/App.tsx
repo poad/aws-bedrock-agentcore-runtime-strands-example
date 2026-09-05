@@ -1,5 +1,3 @@
-import { SignOutButton } from './components/SignOut.jsx';
-import { runAgentTurn } from './service/AgentCoreRuntimeService.ts';
 import { Authenticator, Button, Input } from '@aws-amplify/ui-react';
 import {
   MainContainer,
@@ -9,14 +7,16 @@ import {
   Message,
   TypingIndicator,
 } from '@chatscope/chat-ui-kit-react';
-import { useRef, useState, useEffect } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { useRef, useState, useEffect } from 'react';
 import { Streamdown } from 'streamdown';
+
+import { SignOutButton } from './components/SignOut.jsx';
+import { runAgentTurn } from './service/AgentCoreRuntimeService.ts';
+
 import 'streamdown/styles.css';
 
-type MessageSegment =
-  | { type: 'text'; content: string }
-  | { type: 'tool'; toolCall: ToolCall };
+type MessageSegment = { type: 'text'; content: string } | { type: 'tool'; toolCall: ToolCall };
 
 interface History {
   content: string;
@@ -38,11 +38,11 @@ const url = `${endpoint}/runtimes/${escapedArn}/invocations?qualifier=DEFAULT`;
 type ToolCallStatus = 'streaming' | 'executing' | 'complete';
 
 interface ToolCall {
-  toolUseId: string
-  name: string
-  input: string
-  result?: string
-  status: ToolCallStatus
+  toolUseId: string;
+  name: string;
+  input: string;
+  result?: string;
+  status: ToolCallStatus;
 }
 
 const streamEventHandler = async (
@@ -51,10 +51,12 @@ const streamEventHandler = async (
   setIsLoading: (state: boolean) => void,
 ) => {
   console.log(event);
-  updateMessage([{
-    type: 'text',
-    content: event as string,
-  }]);
+  updateMessage([
+    {
+      type: 'text',
+      content: event as string,
+    },
+  ]);
   setIsLoading(false);
 };
 
@@ -111,7 +113,9 @@ function InterruptModal({
           {interrupt.name || '確認が必要です'}
         </h2>
         <p style={{ margin: '0 0 24px 0', color: '#666', whiteSpace: 'pre-wrap' }}>
-          {typeof interrupt.reason === 'string' ? interrupt.reason : JSON.stringify(interrupt.reason, null, 2)}
+          {typeof interrupt.reason === 'string'
+            ? interrupt.reason
+            : JSON.stringify(interrupt.reason, null, 2)}
         </p>
         <form onSubmit={handleSubmit}>
           <Input
@@ -122,8 +126,12 @@ function InterruptModal({
             style={{ width: '100%', marginBottom: '16px' }}
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-            <Button variation="link" onClick={onCancel}>キャンセル</Button>
-            <Button variation="primary" onClick={handleSubmit} disabled={!response.trim()}>送信</Button>
+            <Button variation="link" onClick={onCancel}>
+              キャンセル
+            </Button>
+            <Button variation="primary" onClick={handleSubmit} disabled={!response.trim()}>
+              送信
+            </Button>
           </div>
         </form>
       </div>
@@ -137,7 +145,9 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [sessionId] = useState(() => crypto.randomUUID());
   const [currentInterrupt, setCurrentInterrupt] = useState<InterruptPayload | null>(null);
-  const [interruptResolve, setInterruptResolve] = useState<((response: string) => void) | null>(null);
+  const [interruptResolve, setInterruptResolve] = useState<((response: string) => void) | null>(
+    null,
+  );
 
   const updateMessage = (segments: MessageSegment[]) => {
     // Build content from text segments for backward compat
@@ -166,7 +176,7 @@ function App() {
     });
   };
 
-  async function invoke({ message, sessionId }: { message: string, sessionId: string }) {
+  async function invoke({ message, sessionId }: { message: string; sessionId: string }) {
     const session = await fetchAuthSession();
     const accessToken = session.tokens?.accessToken;
     if (!accessToken) {
@@ -191,8 +201,7 @@ function App() {
         streamEventHandler(text, updateMessage, setIsLoading);
       },
       onMessage: (event) => streamEventHandler(event, updateMessage, setIsLoading),
-    },
-    );
+    });
   }
 
   return (
@@ -206,48 +215,48 @@ function App() {
             <MainContainer>
               <ChatContainer>
                 <MessageList>
-                  {
-                    messages.map((message, index) => (
-                      <Message
-                        key={`message-${index}`}
-                        model={{
-                          sender: message.sender,
-                          direction: message.sender === 'あなた' ? 'incoming' : 'outgoing',
-                          position: 'normal',
-                        }}>
-                        <Message.CustomContent>
-                          <div>
-                            <Streamdown
-                              key={index}
-                              animated
-                              // plugins={{ code, mermaid, math, cjk }}
-                              isAnimating={true}
-                            >
-                              {message.content}
-                            </Streamdown>
-                          </div>
-                        </Message.CustomContent>
-                      </Message>
-                    ))
-                  }
-                  {
-                    isLoading ? <TypingIndicator content="thinking" /> : <></>
-                  }
+                  {messages.map((message, index) => (
+                    <Message
+                      key={`message-${index}`}
+                      model={{
+                        sender: message.sender,
+                        direction: message.sender === 'あなた' ? 'incoming' : 'outgoing',
+                        position: 'normal',
+                      }}
+                    >
+                      <Message.CustomContent>
+                        <div>
+                          <Streamdown
+                            key={index}
+                            animated
+                            // plugins={{ code, mermaid, math, cjk }}
+                            isAnimating={true}
+                          >
+                            {message.content}
+                          </Streamdown>
+                        </div>
+                      </Message.CustomContent>
+                    </Message>
+                  ))}
+                  {isLoading ? <TypingIndicator content="thinking" /> : <></>}
                 </MessageList>
                 <MessageInput
                   ref={inputRef}
                   placeholder="メッセージを入力..."
-                  onSend={async (
-                    _innerHtml: string,
-                    textContent: string) => {
-                    setMessages((history) => [...history, {
-                      content: textContent,
-                      sender: 'あなた',
-                      segments: [{
-                        type: 'text',
+                  onSend={async (_innerHtml: string, textContent: string) => {
+                    setMessages((history) => [
+                      ...history,
+                      {
                         content: textContent,
-                      }],
-                    }]);
+                        sender: 'あなた',
+                        segments: [
+                          {
+                            type: 'text',
+                            content: textContent,
+                          },
+                        ],
+                      },
+                    ]);
                     await invoke({ message: textContent, sessionId });
                   }}
                 />

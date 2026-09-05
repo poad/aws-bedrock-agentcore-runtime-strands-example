@@ -1,5 +1,5 @@
-import { defineConfig } from 'vitest/config';
 import * as dotenv from '@dotenvx/dotenvx';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   server: {

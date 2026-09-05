@@ -1,26 +1,30 @@
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cdk from 'aws-cdk-lib/core';
 import { Construct } from 'constructs';
-import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class DeployRoleStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const cdkDeployPolicy = iam.ManagedPolicy.fromManagedPolicyName(this, 'CdkDeployPolicy', 'CdkDeployMinimalPolicy');
+    const cdkDeployPolicy = iam.ManagedPolicy.fromManagedPolicyName(
+      this,
+      'CdkDeployPolicy',
+      'CdkDeployMinimalPolicy',
+    );
 
     new iam.Role(this, 'Role', {
       roleName: 'aws-bedrock-agentcore-runtime-strands-example-deploy-role',
       assumedBy: new iam.FederatedPrincipal(
-        `arn:aws:iam::${this.account}:oidc-provider/token.actions.githubusercontent.com`, {
+        `arn:aws:iam::${this.account}:oidc-provider/token.actions.githubusercontent.com`,
+        {
           StringLike: {
-            'token.actions.githubusercontent.com:sub': 'repo:poad/aws-bedrock-agentcore-runtime-strands-example:*',
+            'token.actions.githubusercontent.com:sub':
+              'repo:poad/aws-bedrock-agentcore-runtime-strands-example:*',
           },
         },
         'sts:AssumeRoleWithWebIdentity',
       ).withSessionTags(),
-      managedPolicies: [
-        cdkDeployPolicy,
-      ],
+      managedPolicies: [cdkDeployPolicy],
       inlinePolicies: {
         'iam-policy': new iam.PolicyDocument({
           statements: [

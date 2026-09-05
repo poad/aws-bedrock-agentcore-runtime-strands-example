@@ -10,9 +10,9 @@
  */
 
 interface InterruptPayload {
-  id: string
-  name: string
-  reason: unknown
+  id: string;
+  name: string;
+  reason: unknown;
 }
 
 type AgentEvent =
@@ -23,13 +23,13 @@ type AgentEvent =
 export type AskUserFn = (interrupt: InterruptPayload) => Promise<string>;
 
 export async function runAgentTurn(params: {
-  endpoint: string
-  sessionId: string
-  prompt: string
-  authToken?: string
-  onAskUser: AskUserFn
-  onDelta?: (text: string) => void
-  onMessage: (message: unknown) => void
+  endpoint: string;
+  sessionId: string;
+  prompt: string;
+  authToken?: string;
+  onAskUser: AskUserFn;
+  onDelta?: (text: string) => void;
+  onMessage: (message: unknown) => void;
 }): Promise<void> {
   const { endpoint, sessionId, prompt, authToken, onAskUser, onDelta, onMessage } = params;
 

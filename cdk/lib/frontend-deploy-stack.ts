@@ -1,7 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
-import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import { Construct } from 'constructs';
 
@@ -31,18 +31,13 @@ export class FrontendDeployStack extends cdk.Stack {
         ),
       ],
       inlinePolicies: {
-        'S3AccessPolicy': new iam.PolicyDocument({
+        S3AccessPolicy: new iam.PolicyDocument({
           statements: [
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
               sid: 's3access',
-              actions: [
-                's3:*',
-              ],
-              resources: [
-                props.websiteBucket.bucketArn,
-                `${props.websiteBucket.bucketArn}/*`,
-              ],
+              actions: ['s3:*'],
+              resources: [props.websiteBucket.bucketArn, `${props.websiteBucket.bucketArn}/*`],
             }),
           ],
         }),

@@ -16,20 +16,20 @@ GitHub Actions から OIDC（OpenID Connect）でこのリポジトリの CDK �
 
 deploy-role/
 ├── bin/
-│   └── deploy-role.ts        # CDK アプリのエントリポイント
+│ └── deploy-role.ts # CDK アプリのエントリポイント
 ├── lib/
-│   └── deploy-role-stack.ts  # DeployRoleStack の定義
+│ └── deploy-role-stack.ts # DeployRoleStack の定義
 ├── cdk.json
 └── package.json
 
 ## よく使うコマンド
 
-- `pnpm build`                  TypeScript を JavaScript にコンパイル
-- `pnpm watch`                  変更を監視してコンパイル
-- `pnpm test`                   ユニットテストを実行（vitest）
-- `pnx aws-cdk@latest deploy`   このスタックをデフォルトの AWS アカウント／リージョンにデプロイ
-- `pnx aws-cdk@latest diff`     デプロイ済みスタックと現在の状態を比較
-- `pnx aws-cdk@latest synth`    CloudFormation テンプレートを生成
+- `pnpm build` TypeScript を JavaScript にコンパイル
+- `pnpm watch` 変更を監視してコンパイル
+- `pnpm test` ユニットテストを実行（vitest）
+- `pnx aws-cdk@latest deploy` このスタックをデフォルトの AWS アカウント／リージョンにデプロイ
+- `pnx aws-cdk@latest diff` デプロイ済みスタックと現在の状態を比較
+- `pnx aws-cdk@latest synth` CloudFormation テンプレートを生成
 
 ## デプロイ
 

@@ -1,12 +1,19 @@
+import { NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node';
+import {
+  Agent,
+  AgentResult,
+  AgentStreamEvent,
+  Interrupt,
+  InterruptResponseContent,
+} from '@strands-agents/sdk';
+import { setupTracer } from '@strands-agents/sdk/telemetry';
+import { withAccessToken } from 'bedrock-agentcore/identity';
+import { BedrockAgentCoreApp, RequestContext } from 'bedrock-agentcore/runtime';
+import { z } from 'zod';
+
 import { createAgent } from './agent.js';
 import { init } from './observability/exporters.js';
 import { ChatRequest, requestSchema } from './types.js';
-import { BedrockAgentCoreApp, RequestContext } from 'bedrock-agentcore/runtime';
-import { z } from 'zod';
-import { setupTracer } from '@strands-agents/sdk/telemetry';
-import { NodeTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-node';
-import { withAccessToken } from 'bedrock-agentcore/identity';
-import { Agent, AgentResult, AgentStreamEvent, Interrupt, InterruptResponseContent } from '@strands-agents/sdk';
 
 /** SDKの Interrupt から、フロントエンドに渡す分だけを取り出した型 */
 type InterruptPayload = Pick<Interrupt, 'id' | 'name' | 'reason'>;
@@ -49,7 +56,10 @@ const app = new BedrockAgentCoreApp({
   invocationHandler: {
     requestSchema,
     process: async function* (request: Request, context: RequestContext) {
-      interface CachedToken { readonly token: string; readonly expiresAt: number }
+      interface CachedToken {
+        readonly token: string;
+        readonly expiresAt: number;
+      }
 
       const createDatabricksTokenProvider = () => {
         const providerName = process.env.DATABRICKS_OAUTH_PROVIDER_NAME;
@@ -87,9 +97,7 @@ const app = new BedrockAgentCoreApp({
         const provider = new NodeTracerProvider({
           spanProcessors: [
             // Configure OTLP endpoint programmatically
-            new SimpleSpanProcessor(
-              exporters.trace,
-            ),
+            new SimpleSpanProcessor(exporters.trace),
           ],
         });
         setupTracer({
@@ -111,7 +119,11 @@ const app = new BedrockAgentCoreApp({
         const event = step.value;
 
         // トークン単位のテキストデルタをそのままSSEで流す
-        if (event.type === 'modelStreamUpdateEvent' && event.event.type === 'modelContentBlockDeltaEvent' && event.event.delta?.type === 'textDelta') {
+        if (
+          event.type === 'modelStreamUpdateEvent' &&
+          event.event.type === 'modelContentBlockDeltaEvent' &&
+          event.event.delta?.type === 'textDelta'
+        ) {
           yield { event: 'messageDelta', data: { text: event.event.delta.text } };
         }
 
