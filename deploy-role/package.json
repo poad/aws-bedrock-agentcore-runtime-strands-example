@@ -10,7 +10,7 @@
     "lint-fix": "oxfmt && oxlint . --fix"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.267.0",
+    "aws-cdk-lib": "^2.273.0",
     "constructs": "^10.8.1"
   },
   "devDependencies": {
@@ -18,10 +18,10 @@
     "@types/node": "24.10.1",
     "@vitest/eslint-plugin": "^1.6.27",
     "aws-cdk": "^2.1139.0",
-    "oxlint-plugin-awscdk": "^1.0.0",
-    "tsx": "^4.23.12",
+    "oxlint-plugin-awscdk": "^1.0.3",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "vite": "^8.3.4",
+    "vitest": "^4.1.12"
   }
 }
