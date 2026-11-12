@@ -19,9 +19,7 @@ export function buildAssets() {
     const basePath = `${process.cwd()}/${f}`;
 
     if (fs.existsSync(`${basePath}/.agentcore-staging`)) {
-      fs.rmdirSync(`${basePath}/.agentcore-staging`, {
-        recursive: true,
-      });
+      fs.rmdirSync(`${basePath}/.agentcore-staging`);
     }
 
     ['pnpm install', 'pnpm build'].forEach((cmd) => {
