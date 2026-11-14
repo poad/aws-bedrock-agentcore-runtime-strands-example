@@ -19,6 +19,10 @@ engineStrict: true
 minimumReleaseAge: 10080 # 7 days in minutes
 minimumReleaseAgeExclude:
   - pnpm@12.20.0
+  - '@aws-sdk/credential-provider-http@3.972.83'
+  - '@aws-sdk/credential-provider-ini@3.973.26'
+  - '@aws-sdk/credential-provider-sso@3.973.25'
+  - '@aws-sdk/nested-clients@3.998.0'
 
 overrides:
   chokidar: '>=5'
